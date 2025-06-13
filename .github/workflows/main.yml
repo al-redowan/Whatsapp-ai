@@ -1,0 +1,73 @@
+
+name: Unzip All ZIP Files
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_directory:
+        description: 'Directory to search for ZIP files (default: current directory)'
+        required: false
+        default: '.'
+      extract_to:
+        description: 'Directory to extract files to (default: same as ZIP location)'
+        required: false
+        default: 'same'
+
+jobs:
+  unzip-files:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Find and unzip all ZIP files
+      run: |
+        echo "🔍 Searching for ZIP files in: ${{ github.event.inputs.target_directory || '.' }}"
+        
+        # Find all ZIP files
+        find "${{ github.event.inputs.target_directory || '.' }}" -type f -name "*.zip" | while read -r zipfile; do
+          echo "📦 Found ZIP file: $zipfile"
+          
+          # Determine extraction directory
+          if [ "${{ github.event.inputs.extract_to }}" = "same" ]; then
+            extract_dir=$(dirname "$zipfile")
+          else
+            extract_dir="${{ github.event.inputs.extract_to }}"
+            mkdir -p "$extract_dir"
+          fi
+          
+          echo "📂 Extracting to: $extract_dir"
+          
+          # Extract the ZIP file
+          unzip -o "$zipfile" -d "$extract_dir"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Successfully extracted: $zipfile"
+            
+            # List extracted contents
+            echo "📋 Extracted files:"
+            unzip -l "$zipfile"
+          else
+            echo "❌ Failed to extract: $zipfile"
+          fi
+          
+          echo "---"
+        done
+        
+        echo "🎉 Unzip operation completed!"
+        
+    - name: Show directory structure after extraction
+      run: |
+        echo "📁 Current directory structure:"
+        find "${{ github.event.inputs.target_directory || '.' }}" -type f -name "*.zip" -o -name "*.tar.gz" | head -20
+        
+    - name: Upload extracted files as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: extracted-files
+        path: |
+          **/*
+          !**/*.zip
+        retention-days: 30
+        
